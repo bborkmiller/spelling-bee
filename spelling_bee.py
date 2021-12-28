@@ -14,7 +14,7 @@ class SpellingBee:
 
     def generate_grid(self, words):
         """Generate a grid from a list of words.
-        
+
         The grid is a dictionary with the format
             {'Letter': [list of counts by word length]}
         """
@@ -57,17 +57,17 @@ class SpellingBee:
             )
 
         self.player_grid = self.generate_grid(found)
-        
+
     def generate_player_tll(self):
-        
+
         try:
             found = self.found_words
         except AttributeError:
             raise AttributeError(
                 "No record of found words. Run read_found_words on your word list first."
             )
-            
-        self.two_letter_list = generate_two_letter_list(found)
+
+        self.two_letter_list = self.generate_two_letter_list(found)
 
     def format_grid(self, grid):
         """Format a grid dictionary into a string for printing"""
@@ -164,8 +164,17 @@ class SpellingBee:
 
     def compare_grids(self):
         """Compares the player's grid to the official grid"""
-        official_grid = self.official_grid
-        grid = self.player_grid
+        try:
+            grid = self.player_grid
+        except AttributeError:
+            self.generate_player_grid()
+            grid = self.player_grid
+            
+        try:
+            official_grid = self.official_grid
+        except AttributeError:
+            self.import_puzzle()
+            official_grid = self.official_grid
 
         # Pad out player's grid if necessary
         len_diff = len(list(official_grid.values())[0]) - len(list(grid.values())[0])
@@ -185,8 +194,17 @@ class SpellingBee:
         self.grid_comparison = diffs
 
     def compare_two_letter_lists(self):
-        official_tll = self.official_two_letter_list
-        player_tll = self.two_letter_list
+        try:
+            player_tll = self.two_letter_list
+        except AttributeError:
+            self.generate_player_tll()
+            player_tll = self.two_letter_list
+        
+        try:
+            official_tll = self.official_two_letter_list
+        except AttributeError:
+            self.import_puzzle()
+            official_tll = self.official_two_letter_list
 
         diffs = {}
         for combo in sorted(official_tll):
@@ -270,7 +288,6 @@ class SpellingBee:
         data = json.loads(scripts[0][len("wondow.gameData = ") :])
 
         self.answers = [w.upper() for w in data["today"]["answers"]]
-        
+
         self.official_grid = self.generate_grid(self.answers)
         self.official_two_letter_list = self.generate_two_letter_list(self.answers)
-        
