@@ -278,15 +278,13 @@ class SpellingBee:
 
         print(self.format_two_letter_list(tll))
 
-    def print_counts(self):
-        self.print_grid(type="player")
+    def print_counts(self, type="player"):
+        if type not in ["player", "official"]:
+            raise ValueError("Valid types are 'player' and 'official'")
+            
+        self.print_grid(type=type)
         print()
-        self.print_two_letter_list(type="player")
-
-    def print_official_counts(self):
-        self.print_grid(type="official")
-        print()
-        self.print_two_letter_list(type="official")
+        self.print_two_letter_list(type=type)
 
     def print_grid_comparison(self):
         try:
@@ -307,3 +305,8 @@ class SpellingBee:
 
         print(self.bold("- Two Letter List Comparison"))
         print(self.format_two_letter_list(comparison, only_nonzero))
+        
+    def print_comparison(self):
+        self.print_grid_comparison()
+        print()
+        self.print_two_letter_list_comparison()
