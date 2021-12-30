@@ -7,10 +7,33 @@ class SpellingBee:
     def __init__(self):
         pass
 
+    def bold(self, input):
+        """Bold a word (for output purposes)"""
+        return "\033[1m" + input + "\033[0m"
+
     def read_found_words(self, input_text):
         """Read in pasted text and set the found_words property"""
 
         self.found_words = [w.upper() for w in input_text.split()]
+
+    def import_puzzle(self):
+        """
+        Read in answers directly from nytimes.com
+
+        Logic borrowed from/inspired by https://github.com/thisisparker/nytsb/blob/main/nytsb.py
+        """
+        url = "https://www.nytimes.com/puzzles/spelling-bee"
+        res = urllib.request.urlopen(url)
+
+        pattern = re.compile("window.gameData = .*?}}")
+
+        scripts = re.findall(pattern, res.read().decode("utf-8"))
+        data = json.loads(scripts[0][len("window.gameData = ") :])
+
+        self.answers = [w.upper() for w in data["today"]["answers"]]
+
+        self.official_grid = self.generate_grid(self.answers)
+        self.official_two_letter_list = self.generate_two_letter_list(self.answers)
 
     def generate_grid(self, words):
         """Generate a grid from a list of words.
@@ -169,7 +192,7 @@ class SpellingBee:
         except AttributeError:
             self.generate_player_grid()
             grid = self.player_grid
-            
+
         try:
             official_grid = self.official_grid
         except AttributeError:
@@ -199,7 +222,7 @@ class SpellingBee:
         except AttributeError:
             self.generate_player_tll()
             player_tll = self.two_letter_list
-        
+
         try:
             official_tll = self.official_two_letter_list
         except AttributeError:
@@ -213,50 +236,66 @@ class SpellingBee:
 
         self.two_letter_list_comparison = diffs
 
-    def print_player_grid(self):
-        print(self.bold("- Player's Grid"))
-        try:
-            grid = self.player_grid
-        except AttributeError:
-            self.generate_player_grid()
-            grid = self.player_grid
+    def print_grid(self, type="player"):
+        if type == "player":
+            try:
+                grid = self.player_grid
+            except AttributeError:
+                self.generate_player_grid()
+                grid = self.player_grid
+
+            print(self.bold("- Player's Grid"))
+
+        elif type == "official":
+            try:
+                grid = self.official_grid
+            except AttributeError:
+                self.import_puzzle()
+                grid = self.official_grid
+
+            print(self.bold("- Official Grid"))
+
+        else:
+            raise ValueError("Valid types are 'player' and 'official'")
 
         print(self.format_grid(grid))
 
-    def print_official_grid(self):
-        print(self.bold("- Official Grid"))
-        print(self.format_grid(self.official_grid))
-
-    def print_two_letter_list(self):
-        try:
-            tll = self.two_letter_list
-        except AttributeError:
-            self.generate_two_letter_list()
-            tll = self.two_letter_list
+    def print_two_letter_list(self, type="player"):
+        if type == "player":
+            try:
+                tll = self.two_letter_list
+            except AttributeError:
+                self.generate_two_letter_list()
+                tll = self.two_letter_list
+        elif type == "official":
+            try:
+                tll = self.official_two_letter_list
+            except AttributeError:
+                self.import_puzzle()
+                tll = self.official_two_letter_list
+        else:
+            raise ValueError("Valid types are 'player' and 'official'")
 
         print(self.format_two_letter_list(tll))
 
-    def print_official_two_letter_list(self):
-        print(self.format_two_letter_list(self.official_two_letter_list))
-
     def print_counts(self):
-        self.print_player_grid()
+        self.print_grid(type="player")
         print()
-        self.print_two_letter_list()
+        self.print_two_letter_list(type="player")
 
     def print_official_counts(self):
-        self.print_official_grid()
+        self.print_grid(type="official")
         print()
-        self.print_official_two_letter_list()
+        self.print_two_letter_list(type="official")
 
     def print_grid_comparison(self):
-        print(self.bold("- Grid Comparison"))
         try:
             grid = self.grid_comparison
         except AttributeError:
             self.compare_grids()
             grid = self.grid_comparison
 
+        print(self.bold("- Grid Comparison"))
         print(self.format_grid(grid))
 
     def print_two_letter_list_comparison(self, only_nonzero=True):
@@ -268,26 +307,3 @@ class SpellingBee:
 
         print(self.bold("- Two Letter List Comparison"))
         print(self.format_two_letter_list(comparison, only_nonzero))
-
-    def bold(self, input):
-        """Bold a word (for output purposes)"""
-        return "\033[1m" + input + "\033[0m"
-
-    def import_puzzle(self):
-        """
-        Read in answers directly from nytimes.com
-
-        Logic borrowed from/inspired by https://github.com/thisisparker/nytsb/blob/main/nytsb.py
-        """
-        url = "https://www.nytimes.com/puzzles/spelling-bee"
-        res = urllib.request.urlopen(url)
-
-        pattern = re.compile("window.gameData = .*?}}")
-
-        scripts = re.findall(pattern, res.read().decode("utf-8"))
-        data = json.loads(scripts[0][len("wondow.gameData = ") :])
-
-        self.answers = [w.upper() for w in data["today"]["answers"]]
-
-        self.official_grid = self.generate_grid(self.answers)
-        self.official_two_letter_list = self.generate_two_letter_list(self.answers)
