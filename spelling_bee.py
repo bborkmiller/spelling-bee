@@ -1,6 +1,7 @@
 import json
 import re
 import urllib.request
+from collections import Counter
 
 
 class SpellingBee:
@@ -36,41 +37,29 @@ class SpellingBee:
         self.official_two_letter_list = self.generate_two_letter_list(self.answers)
 
     def generate_grid(self, words):
-        """Generate a grid from a list of words.
+        """Generate a word count grid from a list of words.
 
         The grid is a dictionary with the format
-            {'Letter': [list of counts by word length]}
+            {'letter': Counter(length:count...)}
         """
 
         first_letters = {w[0] for w in words}
-        max_len = max([len(w) for w in words])
 
-        # Populate a dummy dictionary
-        # Odd construction to make a deep copy of the list of zeroes
-        empty_counts = [
-            ([0] * (max_len - 3)).copy() for i in range(0, len(first_letters))
-        ]
-        grid = dict(zip(first_letters, empty_counts))
-
-        for word in words:
-            grid[word[0]][len(word) - 4] += 1
+        grid = {}
+        for letter in first_letters:
+            grid[letter] = Counter([len(w) for w in words if w[0] == letter])
 
         return grid
 
     def generate_two_letter_list(self, words):
         """Count words by their first two letters"""
 
-        # Populate a dummy dictionary for the two letter list
-        tl_combos = {w[:2] for w in words}
-        two_letter_list = dict(zip(tl_combos, [0] * len(tl_combos)))
-
-        # Loop through found words and fill in counts
-        for word in words:
-            two_letter_list[word[:2]] += 1
+        two_letter_list = Counter([w[0:2] for w in words])
 
         return two_letter_list
 
     def generate_player_grid(self):
+        """Initialize the player's word count grid"""
 
         try:
             found = self.found_words
@@ -82,6 +71,7 @@ class SpellingBee:
         self.player_grid = self.generate_grid(found)
 
     def generate_player_tll(self):
+        """Initialize the player's two-letter list"""
 
         try:
             found = self.found_words
@@ -96,25 +86,31 @@ class SpellingBee:
         """Format a grid dictionary into a string for printing"""
 
         grid_output = ""
-        max_len = len(list(grid.values())[0]) + 3
 
-        header = (
-            "  " + "".join([str(l).rjust(3) for l in range(4, max_len + 1)]) + "   Σ\n"
-        )
+        # Get max word length
+        max_len = max([max(c.keys()) for c in grid.values() if len(c) > 0])
+
+        header = f"  {''.join([str(l).rjust(3) for l in range(4, max_len + 1)])}   Σ\n"
         grid_output += self.bold(header)
 
         # Format the letter rows
-        for letter in sorted(grid):
-            counts = "".join([str(count).rjust(3) for count in grid[letter]]).replace(
-                "0", "-"
+        default_counts = dict.fromkeys(range(4, max_len + 1), 0)
+        length_sums = dict.fromkeys(range(4, max_len + 1), 0)
+        for letter, counts in grid.items():
+            full_counts = default_counts | counts
+            counts_text = "".join(
+                [str(c).rjust(3) for c in list(full_counts.values())]
             )
-            letter_sum = self.bold(str(sum(grid[letter])).rjust(4))
-            grid_output += f"{self.bold(letter)}:{counts}{letter_sum}\n"
+            letter_sum = self.bold(str(sum(counts.values())).rjust(4))
+            grid_output += f"{letter.upper()}:{counts_text}{letter_sum}\n"
+
+            # Add count by word length to length_sums
+            for k, v in counts.items():
+                length_sums[k] += v
 
         # Generate the summary row
-        length_sums = [sum(i) for i in zip(*grid.values())]
-        total = str(sum(length_sums)).rjust(4)
-        sum_string = "".join([str(sum).rjust(3) for sum in length_sums])
+        total = str(sum(length_sums.values())).rjust(4)
+        sum_string = "".join([str(sum).rjust(3) for sum in length_sums.values()])
         summary = self.bold(f"Σ:{sum_string}{total}")
         grid_output += summary
 
@@ -155,23 +151,15 @@ class SpellingBee:
         # Eliminate any extra blank rows at the beginning or end
         lines = [line for line in lines if line]
 
-        # Check for a missing index, if counts go e.g. 4 5 6 8
-        header = [int(i) for i in lines[0].split("\t")[:-1]]
-        full_range = list(range(4, max(header) + 1))
-        index_compare = set(full_range) - set(header)
-        if index_compare:
-            missing_index = sorted(list(index_compare))
+        header = [int(i) for i in lines[0].split("\t")[:-1] if i]
 
         # Parse the grid text into a dictionary
         grid = {}
         for line in lines[1:-1]:
             letter, counts_str = line.split(":")
             counts_str = counts_str.strip().split("\t")[:-1]
-            counts = [int(count) if "-" not in count else 0 for count in counts_str]
-            if index_compare:
-                for mi in missing_index:
-                    counts.insert(mi - 4, 0)
-            grid[letter] = counts
+            counts = [int(count) for count in counts_str if count != "-"]
+            grid[letter] = Counter(dict(zip(header, counts)))
 
         self.official_grid = grid
 
@@ -179,7 +167,7 @@ class SpellingBee:
         if tll_text:
             tll_items = [line.split() for line in tll_text.split("\n")]
             tll_items = [item for sublist in tll_items for item in sublist]
-            two_letter_list = {}
+            two_letter_list = Counter()
             for item in tll_items:
                 two_letter_list[item[:2]] = int(item[3:])
 
@@ -199,19 +187,12 @@ class SpellingBee:
             self.import_puzzle()
             official_grid = self.official_grid
 
-        # Pad out player's grid if necessary
-        len_diff = len(list(official_grid.values())[0]) - len(list(grid.values())[0])
-        if len_diff:
-            for letter in grid.keys():
-                grid[letter] = grid[letter] + [0] * len_diff
-
         diffs = {}
         for letter in sorted(official_grid):
             if letter in grid:
-                diff = [a - b for a, b in zip(official_grid[letter], grid[letter])]
+                diff = official_grid[letter] - grid[letter]
             else:
                 diff = official_grid[letter]
-
             diffs[letter] = diff
 
         self.grid_comparison = diffs
@@ -229,10 +210,7 @@ class SpellingBee:
             self.import_puzzle()
             official_tll = self.official_two_letter_list
 
-        diffs = {}
-        for combo in sorted(official_tll):
-            diff = official_tll[combo] - player_tll.get(combo, 0)
-            diffs[combo] = diff
+        diffs = official_tll - player_tll
 
         self.two_letter_list_comparison = diffs
 
@@ -265,7 +243,7 @@ class SpellingBee:
             try:
                 tll = self.two_letter_list
             except AttributeError:
-                self.generate_two_letter_list()
+                self.generate_player_tll()
                 tll = self.two_letter_list
         elif type == "official":
             try:
@@ -281,7 +259,7 @@ class SpellingBee:
     def print_counts(self, type="player"):
         if type not in ["player", "official"]:
             raise ValueError("Valid types are 'player' and 'official'")
-            
+
         self.print_grid(type=type)
         print()
         self.print_two_letter_list(type=type)
@@ -305,7 +283,7 @@ class SpellingBee:
 
         print(self.bold("- Two Letter List Comparison"))
         print(self.format_two_letter_list(comparison, only_nonzero))
-        
+
     def print_comparison(self):
         self.print_grid_comparison()
         print()
