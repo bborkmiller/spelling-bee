@@ -7,16 +7,19 @@ from collections import Counter
 class SpellingBee:
     def __init__(self, found_words=None):
         if found_words:
-            self.found_words = [w.upper() for w in input_text.split()]
+            self.found_words = [w.upper() for w in found_words.split()]
         else:
             self.found_words = None
 
         self.answers = None
         self.official_grid = None
         self.official_two_letter_list = None
-        
+
         self.two_letter_list = None
         self.player_grid = None
+
+        self.grid_comparison = None
+        self.two_letter_list_comparison = None
 
     def bold(self, input):
         """Bold a word (for output purposes)"""
@@ -71,26 +74,22 @@ class SpellingBee:
     def generate_player_grid(self):
         """Initialize the player's word count grid"""
 
-        try:
-            found = self.found_words
-        except AttributeError:
+        if self.found_words is None:
             raise AttributeError(
                 "No record of found words. Run read_found_words on your word list first."
             )
-
-        self.player_grid = self.generate_grid(found)
+        else:
+            self.player_grid = self.generate_grid(self.found_words)
 
     def generate_player_tll(self):
         """Initialize the player's two-letter list"""
 
-        try:
-            found = self.found_words
-        except AttributeError:
+        if self.found_words is None:
             raise AttributeError(
                 "No record of found words. Run read_found_words on your word list first."
             )
-
-        self.two_letter_list = self.generate_two_letter_list(found)
+        else:
+            self.two_letter_list = self.generate_two_letter_list(self.found_words)
 
     def format_grid(self, grid):
         """Format a grid dictionary into a string for printing"""
@@ -108,9 +107,7 @@ class SpellingBee:
         length_sums = dict.fromkeys(range(4, max_len + 1), 0)
         for letter, counts in grid.items():
             full_counts = default_counts | counts
-            counts_text = "".join(
-                [str(c).rjust(3) for c in list(full_counts.values())]
-            )
+            counts_text = "".join([str(c).rjust(3) for c in list(full_counts.values())])
             letter_sum = self.bold(str(sum(counts.values())).rjust(4))
             grid_output += f"{letter.upper()}:{counts_text}{letter_sum}\n"
 
@@ -185,114 +182,92 @@ class SpellingBee:
 
     def compare_grids(self):
         """Compares the player's grid to the official grid"""
-        try:
-            grid = self.player_grid
-        except AttributeError:
-            self.generate_player_grid()
-            grid = self.player_grid
 
-        try:
-            official_grid = self.official_grid
-        except AttributeError:
+        if self.player_grid is None:
+            self.generate_player_grid()
+
+        if self.official_grid is None:
             self.import_puzzle()
-            official_grid = self.official_grid
 
         diffs = {}
-        for letter in sorted(official_grid):
-            if letter in grid:
-                diff = official_grid[letter] - grid[letter]
-            else:
-                diff = official_grid[letter]
+        for letter in sorted(self.official_grid):
+            diff = self.official_grid[letter] - self.player_grid.get(letter, Counter())
             diffs[letter] = diff
 
         self.grid_comparison = diffs
 
     def compare_two_letter_lists(self):
-        try:
-            player_tll = self.two_letter_list
-        except AttributeError:
+        """Compares the player's two-letter list to the official one"""
+
+        if self.two_letter_list is None:
             self.generate_player_tll()
-            player_tll = self.two_letter_list
 
-        try:
-            official_tll = self.official_two_letter_list
-        except AttributeError:
+        if self.official_two_letter_list is None:
             self.import_puzzle()
-            official_tll = self.official_two_letter_list
 
-        diffs = official_tll - player_tll
-
-        self.two_letter_list_comparison = diffs
+        self.two_letter_list_comparison = (
+            self.official_two_letter_list - self.two_letter_list
+        )
 
     def print_grid(self, type="player"):
         if type == "player":
-            try:
-                grid = self.player_grid
-            except AttributeError:
+            if self.player_grid is None:
                 self.generate_player_grid()
-                grid = self.player_grid
 
+            grid = self.player_grid
             print(self.bold("- Player's Grid"))
 
         elif type == "official":
-            try:
-                grid = self.official_grid
-            except AttributeError:
+            if self.official_grid is None:
                 self.import_puzzle()
-                grid = self.official_grid
 
+            grid = self.official_grid
             print(self.bold("- Official Grid"))
 
         else:
-            raise ValueError("Valid types are 'player' and 'official'")
+            raise ValueError("type={type} - Valid types are 'player' and 'official'")
 
         print(self.format_grid(grid))
 
     def print_two_letter_list(self, type="player"):
         if type == "player":
-            try:
-                tll = self.two_letter_list
-            except AttributeError:
+            if self.two_letter_list is None:
                 self.generate_player_tll()
-                tll = self.two_letter_list
+            tll = self.two_letter_list
+
         elif type == "official":
-            try:
-                tll = self.official_two_letter_list
-            except AttributeError:
+            if self.official_two_letter_list is None:
                 self.import_puzzle()
-                tll = self.official_two_letter_list
+            tll = self.official_two_letter_list
+
         else:
-            raise ValueError("Valid types are 'player' and 'official'")
+            raise ValueError("type={type} - Valid types are 'player' and 'official'")
 
         print(self.format_two_letter_list(tll))
 
     def print_counts(self, type="player"):
         if type not in ["player", "official"]:
-            raise ValueError("Valid types are 'player' and 'official'")
+            raise ValueError("type={type} - Valid types are 'player' and 'official'")
 
         self.print_grid(type=type)
         print()
         self.print_two_letter_list(type=type)
 
     def print_grid_comparison(self):
-        try:
-            grid = self.grid_comparison
-        except AttributeError:
+        if self.grid_comparison is None:
             self.compare_grids()
-            grid = self.grid_comparison
 
         print(self.bold("- Grid Comparison"))
-        print(self.format_grid(grid))
+        print(self.format_grid(self.grid_comparison))
 
     def print_two_letter_list_comparison(self, only_nonzero=True):
-        try:
-            comparison = self.two_letter_list_comparison
-        except AttributeError:
+        if self.two_letter_list_comparison is None:
             self.compare_two_letter_lists()
-            comparison = self.two_letter_list_comparison
 
         print(self.bold("- Two Letter List Comparison"))
-        print(self.format_two_letter_list(comparison, only_nonzero))
+        print(
+            self.format_two_letter_list(self.two_letter_list_comparison, only_nonzero)
+        )
 
     def print_comparison(self):
         self.print_grid_comparison()
