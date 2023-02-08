@@ -5,8 +5,18 @@ from collections import Counter
 
 
 class SpellingBee:
-    def __init__(self):
-        pass
+    def __init__(self, found_words=None):
+        if found_words:
+            self.found_words = [w.upper() for w in input_text.split()]
+        else:
+            self.found_words = None
+
+        self.answers = None
+        self.official_grid = None
+        self.official_two_letter_list = None
+        
+        self.two_letter_list = None
+        self.player_grid = None
 
     def bold(self, input):
         """Bold a word (for output purposes)"""
