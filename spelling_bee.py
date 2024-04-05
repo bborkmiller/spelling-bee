@@ -105,7 +105,7 @@ class SpellingBee:
         # Format the letter rows
         default_counts = dict.fromkeys(range(4, max_len + 1), 0)
         length_sums = dict.fromkeys(range(4, max_len + 1), 0)
-        for letter, counts in grid.items():
+        for letter, counts in sorted(grid.items()):
             full_counts = default_counts | counts
             counts_text = "".join([str(c).rjust(3) for c in list(full_counts.values())])
             letter_sum = self.bold(str(sum(counts.values())).rjust(4))
@@ -165,7 +165,7 @@ class SpellingBee:
         for line in lines[1:-1]:
             letter, counts_str = line.split(":")
             counts_str = counts_str.strip().split("\t")[:-1]
-            counts = [int(count) for count in counts_str if count != "-"]
+            counts = [int(count) if count != "-" else 0 for count in counts_str]
             grid[letter] = Counter(dict(zip(header, counts)))
 
         self.official_grid = grid
